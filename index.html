@@ -143,15 +143,13 @@
 </div>
 
 <script>
-const COLORS = {
-  'Extreme Fear':  '#ef4444',
-  'Fear':          '#f97316',
-  'Neutral':       '#eab308',
-  'Greed':         '#84cc16',
-  'Extreme Greed': '#22c55e',
-};
-
-function getColor(rating) { return COLORS[rating] || '#a1a1aa'; }
+function getColorAndLabel(score) {
+  if (score <= 25) return { color: '#ef4444', label: 'Extreme Fear' };
+  if (score <= 44) return { color: '#f97316', label: 'Fear' };
+  if (score <= 55) return { color: '#eab308', label: 'Neutral' };
+  if (score <= 75) return { color: '#84cc16', label: 'Greed' };
+  return { color: '#22c55e', label: 'Extreme Greed' };
+}
 
 function drawGauge(value, color) {
   const canvas = document.getElementById('gauge');
@@ -194,15 +192,14 @@ async function load() {
     const json = await res.json();
     const fg = json.fear_and_greed;
     const score = Math.round(fg.score);
-    const rating = fg.rating.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase());
-    const color = getColor(rating);
+    const { color, label } = getColorAndLabel(score);
 
     document.getElementById('content').innerHTML = `
       <div class="gauge-wrap">
         <canvas id="gauge"></canvas>
         <div class="score-label">
           <div class="score-num" style="color:${color}">${score}</div>
-          <div class="score-tag" style="color:${color}">${rating}</div>
+          <div class="score-tag" style="color:${color}">${label}</div>
         </div>
       </div>
     `;
