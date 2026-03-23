@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fear & Greed Index</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --card: #f4f4f5;
+    --text: #18181b;
+    --sub: #71717a;
+    --border: #e4e4e7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a1a;
+      --card: #27272a;
+      --text: #fafafa;
+      --sub: #a1a1aa;
+      --border: #3f3f46;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px 28px;
+    width: 100%;
+    max-width: 360px;
+    text-align: center;
+  }
+
+  .header {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--sub);
+    margin-bottom: 18px;
+  }
+
+  .gauge-wrap {
+    position: relative;
+    width: 200px;
+    height: 108px;
+    margin: 0 auto 8px;
+  }
+
+  canvas#gauge {
+    width: 200px;
+    height: 108px;
+  }
+
+  .score-label {
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+
+  .score-num {
+    font-size: 36px;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .score-tag {
+    font-size: 13px;
+    font-weight: 600;
+    margin-top: 4px;
+  }
+
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 18px 0;
+  }
+
+  .prev-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+  }
+
+  .prev-item {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 4px;
+  }
+
+  .prev-label {
+    font-size: 10px;
+    color: var(--sub);
+    margin-bottom: 4px;
+  }
+
+  .prev-num {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .prev-tag {
+    font-size: 9px;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  .updated {
+    font-size: 10px;
+    color: var(--sub);
+    margin-top: 14px;
+  }
+
+  .error-msg {
+    color: var(--sub);
+    font-size: 13px;
+    padding: 20px 0;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">CNN · Fear &amp; Greed Index</div>
+  <div id="content">
+    <div class="error-msg">Loading...</div>
+  </div>
+</div>
+
+<script>
+const COLORS = {
+  'Extreme Fear':  '#ef4444',
+  'Fear':          '#f97316',
+  'Neutral':       '#eab308',
+  'Greed':         '#84cc16',
+  'Extreme Greed': '#22c55e',
+};
+
+function getColor(rating) {
+  return COLORS[rating] || '#a1a1aa';
+}
+
+function drawGauge(canvasId, value, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = 200 * dpr;
+  canvas.height = 108 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const cx = 100, cy = 100, r = 80, lw = 18;
+  const startAngle = Math.PI;
+  const endAngle = 2 * Math.PI;
+
+  // BG arc
+  const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle, endAngle);
+  ctx.strokeStyle = isDark ? '#3f3f46' : '#e4e4e7';
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Value arc
+  const valueAngle = startAngle + (value / 100) * Math.PI;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle, valueAngle);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = lw;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Needle
+  const needleAngle = startAngle + (value / 100) * Math.PI;
+  const nx = cx + (r) * Math.cos(needleAngle);
+  const ny = cy + (r) * Math.sin(needleAngle);
+  ctx.beginPath();
+  ctx.arc(nx, ny, lw / 2 - 2, 0, 2 * Math.PI);
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function scoreTag(rating) {
+  const color = getColor(rating);
+  return `<div class="score-tag" style="color:${color}">${rating}</div>`;
+}
+
+function prevItem(label, num, rating) {
+  const color = getColor(rating);
+  return `
+    <div class="prev-item">
+      <div class="prev-label">${label}</div>
+      <div class="prev-num" style="color:${color}">${num}</div>
+      <div class="prev-tag" style="color:${color}">${rating}</div>
+    </div>`;
+}
+
+async function load() {
+  try {
+    const res = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {cache: 'no-store'});
+    const json = await res.json();
+    const fg = json.fear_and_greed;
+    const score = Math.round(fg.score);
+    const rating = fg.rating.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const color = getColor(rating);
+
+    const prev = json.fear_and_greed_historical?.data || [];
+    const getHist = (days) => {
+      const d = prev.find(p => p.x && Math.abs((Date.now()/1000 - p.x)) < days * 86400 * 1.5);
+      return d ? {num: Math.round(d.y), rating: (d.rating||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())} : null;
+    };
+
+    const hist = json.fear_and_greed_historical?.data || [];
+    function getIdx(i) {
+      const d = hist[hist.length - 1 - i];
+      if (!d) return null;
+      return { num: Math.round(d.y), rating: (d.rating||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()) };
+    }
+    const w = getIdx(7) || {num:'—', rating:''};
+    const m = getIdx(30) || {num:'—', rating:''};
+    const y = getIdx(365) || {num:'—', rating:''};
+
+    const now = new Date(fg.timestamp * 1000 || Date.now());
+    const dateStr = now.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+
+    document.getElementById('content').innerHTML = `
+      <div class="gauge-wrap">
+        <canvas id="gauge"></canvas>
+        <div class="score-label">
+          <div class="score-num" style="color:${color}">${score}</div>
+          ${scoreTag(rating)}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="prev-grid">
+        ${prevItem('1 Week Ago', w.num, w.rating)}
+        ${prevItem('1 Month Ago', m.num, m.rating)}
+        ${prevItem('1 Year Ago', y.num, y.rating)}
+      </div>
+      <div class="updated">Updated ${dateStr}</div>
+    `;
+
+    drawGauge('gauge', score, color);
+
+  } catch(e) {
+    document.getElementById('content').innerHTML =
+      `<div class="error-msg">⚠️ Failed to load data.<br><small>${e.message}</small></div>`;
+  }
+}
+
+load();
+</script>
+</body>
+</html>
