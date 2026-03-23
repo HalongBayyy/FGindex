@@ -143,6 +143,9 @@
 </div>
 
 <script>
+const CNN_URL = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+const PROXY   = 'https://corsproxy.io/?' + encodeURIComponent(CNN_URL);
+
 function getColorAndLabel(score) {
   if (score <= 25) return { color: '#ef4444', label: 'Extreme Fear' };
   if (score <= 44) return { color: '#f97316', label: 'Fear' };
@@ -186,10 +189,22 @@ function drawGauge(value, color) {
   ctx.fill();
 }
 
+async function fetchData(url) {
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.json();
+}
+
 async function load() {
+  let json;
   try {
-    const res = await fetch('https://production.dataviz.cnn.io/index/fearandgreed/graphdata', {cache: 'no-store'});
-    const json = await res.json();
+    // 직접 호출 먼저, 실패하면 프록시
+    try {
+      json = await fetchData(CNN_URL);
+    } catch {
+      json = await fetchData(PROXY);
+    }
+
     const fg = json.fear_and_greed;
     const score = Math.round(fg.score);
     const { color, label } = getColorAndLabel(score);
